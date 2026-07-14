@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
+import { encryptForPublicKey, getClientPublicKey } from "./utils/credentialTransport";
 
 const project = {
   id: "project-1",
@@ -12,6 +13,8 @@ const project = {
   notes: "工作日使用",
   username: "crm-admin",
   password_masked: "********",
+  has_credentials: true,
+  has_screenshot: false,
   is_favorite: true,
   is_enabled: true,
   sort_order: 0,
@@ -23,8 +26,12 @@ function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
-function mockLoggedInProject(fetchMock: ReturnType<typeof vi.fn>) {
+function mockLoggedInProject(fetchMock: ReturnType<typeof vi.fn>, publicKey: string) {
   fetchMock
+    .mockResolvedValueOnce(response({
+      algorithm: "RSA-OAEP-SHA256",
+      public_key: publicKey,
+    }))
     .mockResolvedValueOnce(response({
       access_token: "test-token",
       token_type: "bearer",
@@ -47,11 +54,14 @@ describe("glavk dashboard workflows", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders a project card and reveals its password on demand", async () => {
+  it("renders a project card and copies its password only after in-memory decryption", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    mockLoggedInProject(fetchMock);
-    fetchMock.mockResolvedValueOnce(response({ project_id: "project-1", password: "crm-secret" }));
+    const publicKey = await getClientPublicKey();
+    const envelope = await encryptForPublicKey(publicKey, { username: "crm-admin", password: "crm-secret" });
+    mockLoggedInProject(fetchMock, publicKey);
+    fetchMock.mockResolvedValueOnce(response({ project_id: "project-1", envelope }));
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: vi.fn().mockResolvedValue(undefined) } });
 
     render(<App />);
     login();
@@ -59,16 +69,18 @@ describe("glavk dashboard workflows", () => {
     await waitFor(() => expect(screen.getByText("客户管理后台")).toBeInTheDocument());
     expect(screen.getByText("crm-admin")).toBeInTheDocument();
     expect(screen.getByText("********")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "查看密码" }));
+    expect(screen.queryByText("crm-secret")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "复制密码" }));
 
-    await waitFor(() => expect(screen.getByText("crm-secret")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("密码已复制")).toBeInTheDocument());
     expect(fetchMock).toHaveBeenLastCalledWith("/api/projects/project-1/credential", expect.objectContaining({ headers: expect.any(Headers) }));
   });
 
   it("opens the add drawer, submits a project, and refreshes the list", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    mockLoggedInProject(fetchMock);
+    const publicKey = await getClientPublicKey();
+    mockLoggedInProject(fetchMock, publicKey);
     fetchMock.mockResolvedValueOnce(response({ ...project, id: "project-2", name: "财务系统" }, 201));
     fetchMock.mockResolvedValueOnce(response({ items: [project, { ...project, id: "project-2", name: "财务系统" }], total: 2 }));
 
@@ -80,8 +92,6 @@ describe("glavk dashboard workflows", () => {
     expect(screen.getByRole("heading", { name: "添加网页系统" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("系统名称"), { target: { value: "财务系统" } });
     fireEvent.change(screen.getByLabelText("访问地址"), { target: { value: "https://finance.example.com" } });
-    fireEvent.change(screen.getByLabelText("登录用户名"), { target: { value: "finance-admin" } });
-    fireEvent.change(screen.getByLabelText("系统密码"), { target: { value: "finance-secret" } });
     fireEvent.click(screen.getByRole("button", { name: "保存系统" }));
 
     await waitFor(() => expect(screen.getByText("财务系统")).toBeInTheDocument());

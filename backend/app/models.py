@@ -38,7 +38,8 @@ class WebProject(Base):
     description: Mapped[str] = mapped_column(String(300), nullable=False, server_default="")
     notes: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
     username: Mapped[str] = mapped_column(String(160), nullable=False, server_default="")
-    password_ciphertext: Mapped[str] = mapped_column(Text, nullable=False)
+    password_ciphertext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    screenshot_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_favorite: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("0"))
     is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("1"))
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
@@ -46,4 +47,3 @@ class WebProject(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
-

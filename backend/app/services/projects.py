@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from ..config import Settings
 from ..models import WebProject
-from ..schemas import CredentialRead, ProjectCreate, ProjectListResponse, ProjectRead, ProjectUpdate
+from ..schemas import CredentialData, ProjectCreate, ProjectListResponse, ProjectRead, ProjectUpdate
 
 MASKED_PASSWORD = "********"
 
@@ -26,8 +26,10 @@ class ProjectService:
             category=project.category,
             description=project.description,
             notes=project.notes,
-            username=project.username,
-            password_masked=MASKED_PASSWORD,
+            username="",
+            password_masked=MASKED_PASSWORD if project.password_ciphertext else "",
+            has_credentials=bool(project.username or project.password_ciphertext),
+            has_screenshot=bool(project.screenshot_path),
             is_favorite=project.is_favorite,
             is_enabled=project.is_enabled,
             sort_order=project.sort_order,
@@ -62,7 +64,9 @@ class ProjectService:
         projects = list(session.scalars(statement.order_by(WebProject.sort_order.asc(), WebProject.updated_at.desc())))
         return ProjectListResponse(items=[self._read(project) for project in projects], total=len(projects))
 
-    def create(self, session: Session, payload: ProjectCreate) -> ProjectRead:
+    def create(self, session: Session, payload: ProjectCreate, credentials: CredentialData | None = None) -> ProjectRead:
+        username = credentials.username.strip() if credentials else ""
+        password = credentials.password if credentials else None
         project = WebProject(
             id=str(uuid4()),
             name=payload.name.strip(),
@@ -70,8 +74,12 @@ class ProjectService:
             category=payload.category.strip() or "未分类",
             description=payload.description.strip(),
             notes=payload.notes.strip(),
-            username=payload.username.strip(),
-            password_ciphertext=self._cipher.encrypt(payload.password.encode("utf-8")).decode("ascii"),
+            password_ciphertext=(
+                self._cipher.encrypt(password.encode("utf-8")).decode("ascii")
+                if password
+                else None
+            ),
+            username=username,
             is_favorite=payload.is_favorite,
             is_enabled=payload.is_enabled,
             sort_order=payload.sort_order,
@@ -84,27 +92,53 @@ class ProjectService:
     def get(self, session: Session, project_id: str) -> ProjectRead:
         return self._read(self._get_or_404(session, project_id))
 
-    def update(self, session: Session, project_id: str, payload: ProjectUpdate) -> ProjectRead:
+    def update(
+        self,
+        session: Session,
+        project_id: str,
+        payload: ProjectUpdate,
+        credentials: CredentialData | None = None,
+    ) -> ProjectRead:
         project = self._get_or_404(session, project_id)
         values = payload.model_dump(exclude_unset=True)
-        password = values.pop("password", None)
+        values.pop("credential_envelope", None)
         for key, value in values.items():
             if isinstance(value, str):
                 value = value.strip()
             setattr(project, key, value)
-        if password is not None:
-            project.password_ciphertext = self._cipher.encrypt(password.encode("utf-8")).decode("ascii")
+        if credentials is not None:
+            if "username" in credentials.model_fields_set:
+                project.username = credentials.username.strip()
+            if "password" in credentials.model_fields_set:
+                project.password_ciphertext = (
+                    self._cipher.encrypt(credentials.password.encode("utf-8")).decode("ascii")
+                    if credentials.password
+                    else None
+                )
         session.commit()
         session.refresh(project)
         return self._read(project)
 
-    def reveal(self, session: Session, project_id: str) -> CredentialRead:
+    def credentials(self, session: Session, project_id: str) -> CredentialData:
         project = self._get_or_404(session, project_id)
-        password = self._cipher.decrypt(project.password_ciphertext.encode("ascii")).decode("utf-8")
-        return CredentialRead(project_id=project.id, password=password)
+        password = (
+            self._cipher.decrypt(project.password_ciphertext.encode("ascii")).decode("utf-8")
+            if project.password_ciphertext
+            else None
+        )
+        return CredentialData(username=project.username, password=password)
 
-    def delete(self, session: Session, project_id: str) -> None:
+    def screenshot_path(self, session: Session, project_id: str) -> str | None:
+        return self._get_or_404(session, project_id).screenshot_path
+
+    def set_screenshot_path(self, session: Session, project_id: str, relative_path: str | None) -> None:
         project = self._get_or_404(session, project_id)
-        session.delete(project)
+        project.screenshot_path = relative_path
         session.commit()
 
+    def delete(self, session: Session, project_id: str) -> str | None:
+        project = self._get_or_404(session, project_id)
+        screenshot_path = project.screenshot_path
+        session.delete(project)
+        session.commit()
+        return screenshot_path

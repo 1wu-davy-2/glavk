@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
+import { getClientPublicKey } from "./utils/credentialTransport";
 
 describe("glavk application shell", () => {
   beforeEach(() => {
@@ -10,9 +11,16 @@ describe("glavk application shell", () => {
   });
 
   it("logs in through the Chinese form and opens the dashboard", async () => {
+    const publicKey = await getClientPublicKey();
     vi.stubGlobal(
       "fetch",
       vi.fn()
+        .mockResolvedValueOnce(
+          new Response(JSON.stringify({ algorithm: "RSA-OAEP-SHA256", public_key: publicKey }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        )
         .mockResolvedValueOnce(
           new Response(
             JSON.stringify({

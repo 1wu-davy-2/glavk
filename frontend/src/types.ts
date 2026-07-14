@@ -9,6 +9,18 @@ export interface AuthSession {
   user: AuthUser;
 }
 
+export interface CredentialEnvelope {
+  version: "v1";
+  wrapped_key: string;
+  iv: string;
+  ciphertext: string;
+}
+
+export interface CredentialPayload {
+  username?: string;
+  password?: string | null;
+}
+
 export interface WebProject {
   id: string;
   name: string;
@@ -18,6 +30,8 @@ export interface WebProject {
   notes: string;
   username: string;
   password_masked: string;
+  has_credentials: boolean;
+  has_screenshot: boolean;
   is_favorite: boolean;
   is_enabled: boolean;
   sort_order: number;
@@ -42,4 +56,3 @@ export interface ProjectListResponse {
   items: WebProject[];
   total: number;
 }
-

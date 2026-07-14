@@ -4,13 +4,14 @@ import { login } from "./api/client";
 import { clearSession, loadSession, saveSession } from "./auth/session";
 import { LoginPage } from "./components/LoginPage";
 import { DashboardPage } from "./components/DashboardPage";
+import { clearClientKey } from "./utils/credentialTransport";
 import type { AuthSession } from "./types";
 
 function App() {
   const [session, setSession] = useState<AuthSession | null>(() => loadSession());
 
   useEffect(() => {
-    const handleExpired = () => setSession(null);
+    const handleExpired = () => { clearClientKey(); setSession(null); };
     window.addEventListener("auth-expired", handleExpired);
     return () => window.removeEventListener("auth-expired", handleExpired);
   }, []);
@@ -21,6 +22,7 @@ function App() {
     const checkExpiry = () => {
       const remaining = session.expiresAt - Date.now();
       if (remaining <= 0) {
+        clearClientKey();
         clearSession();
         setSession(null);
         return;
@@ -35,7 +37,7 @@ function App() {
     return <LoginPage onLogin={async (username, password) => { const nextSession = await login(username, password); saveSession(nextSession); setSession(nextSession); return nextSession; }} />;
   }
 
-  return <DashboardPage session={session} onLogout={() => { clearSession(); setSession(null); }} />;
+  return <DashboardPage session={session} onLogout={() => { clearClientKey(); clearSession(); setSession(null); }} />;
 }
 
 export default App;

@@ -1,14 +1,26 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, field_validator
 
 
+class CredentialEnvelope(BaseModel):
+    version: Literal["v1"]
+    wrapped_key: str = Field(min_length=1, max_length=4096)
+    iv: str = Field(min_length=1, max_length=128)
+    ciphertext: str = Field(min_length=1, max_length=20000)
+
+
+class CredentialData(BaseModel):
+    username: str = Field(default="", max_length=160)
+    password: str | None = Field(default=None, max_length=500)
+
+
 class LoginRequest(BaseModel):
-    username: str = Field(min_length=1, max_length=64)
-    password: str = Field(min_length=1, max_length=256)
+    credential_envelope: CredentialEnvelope
 
 
 class AuthUserRead(BaseModel):
@@ -30,8 +42,7 @@ class ProjectCreate(BaseModel):
     category: str = Field(default="未分类", max_length=80)
     description: str = Field(default="", max_length=300)
     notes: str = Field(default="", max_length=5000)
-    username: str = Field(default="", max_length=160)
-    password: str = Field(min_length=1, max_length=500)
+    credential_envelope: CredentialEnvelope | None = None
     is_favorite: bool = False
     is_enabled: bool = True
     sort_order: int = Field(default=0, ge=0, le=100000)
@@ -51,8 +62,7 @@ class ProjectUpdate(BaseModel):
     category: str | None = Field(default=None, max_length=80)
     description: str | None = Field(default=None, max_length=300)
     notes: str | None = Field(default=None, max_length=5000)
-    username: str | None = Field(default=None, max_length=160)
-    password: str | None = Field(default=None, min_length=1, max_length=500)
+    credential_envelope: CredentialEnvelope | None = None
     is_favorite: bool | None = None
     is_enabled: bool | None = None
     sort_order: int | None = Field(default=None, ge=0, le=100000)
@@ -77,6 +87,8 @@ class ProjectRead(BaseModel):
     notes: str
     username: str
     password_masked: str
+    has_credentials: bool
+    has_screenshot: bool
     is_favorite: bool
     is_enabled: bool
     sort_order: int
@@ -91,4 +103,4 @@ class ProjectListResponse(BaseModel):
 
 class CredentialRead(BaseModel):
     project_id: str
-    password: str
+    envelope: CredentialEnvelope

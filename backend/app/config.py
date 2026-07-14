@@ -30,6 +30,9 @@ class Settings:
     credential_encryption_key: str = field(
         default_factory=lambda: os.getenv("CREDENTIAL_ENCRYPTION_KEY", "")
     )
+    transport_private_key_b64: str = field(
+        default_factory=lambda: os.getenv("TRANSPORT_PRIVATE_KEY_B64", "")
+    )
     admin_username: str = field(default_factory=lambda: os.getenv("ADMIN_USERNAME", "admin"))
     admin_password: str = field(default_factory=lambda: os.getenv("ADMIN_PASSWORD", "admin@123"))
     admin_password_hash: str = field(default_factory=lambda: os.getenv("ADMIN_PASSWORD_HASH", ""))
@@ -39,6 +42,10 @@ class Settings:
             for item in os.getenv("CORS_ORIGINS", "http://localhost:6222,http://127.0.0.1:6222,http://localhost:5173").split(",")
             if item.strip()
         )
+    )
+    screenshot_dir: str = field(default_factory=lambda: os.getenv("SCREENSHOT_DIR", "./data/screenshots"))
+    screenshot_allow_private_networks: bool = field(
+        default_factory=lambda: _as_bool(os.getenv("SCREENSHOT_ALLOW_PRIVATE_NETWORKS"))
     )
 
     @property
@@ -65,6 +72,8 @@ class Settings:
             raise RuntimeError("CREDENTIAL_ENCRYPTION_KEY must be set in production")
         if self.credential_encryption_key == "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=":
             raise RuntimeError("Replace the default CREDENTIAL_ENCRYPTION_KEY before production startup")
+        if not self.transport_private_key_b64:
+            raise RuntimeError("TRANSPORT_PRIVATE_KEY_B64 must be set in production")
         try:
             decoded_key = base64.urlsafe_b64decode(self.credential_encryption_key.encode("ascii"))
         except (ValueError, UnicodeEncodeError):

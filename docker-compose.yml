@@ -34,8 +34,13 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-this-before-start}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:6222,http://127.0.0.1:6222}
+      TRANSPORT_PRIVATE_KEY_B64: ${TRANSPORT_PRIVATE_KEY_B64:-}
+      SCREENSHOT_DIR: ${SCREENSHOT_DIR:-/app/data/screenshots}
+      SCREENSHOT_ALLOW_PRIVATE_NETWORKS: ${SCREENSHOT_ALLOW_PRIVATE_NETWORKS:-false}
     ports:
       - "${BACKEND_PORT:-6555}:8000"
+    volumes:
+      - backend_data:/app/data
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
       interval: 15s
@@ -55,3 +60,4 @@ services:
 
 volumes:
   mariadb_data:
+  backend_data:

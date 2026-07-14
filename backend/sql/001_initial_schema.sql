@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS web_projects (
     description VARCHAR(300) NOT NULL DEFAULT '',
     notes TEXT NOT NULL,
     username VARCHAR(160) NOT NULL DEFAULT '',
-    password_ciphertext TEXT NOT NULL,
+    password_ciphertext TEXT NULL,
+    screenshot_path VARCHAR(500) NULL,
     is_favorite BOOLEAN NOT NULL DEFAULT FALSE,
     is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
     sort_order INT NOT NULL DEFAULT 0,
@@ -30,4 +31,3 @@ CREATE TABLE IF NOT EXISTS web_projects (
     INDEX ix_web_projects_favorite (is_favorite),
     INDEX ix_web_projects_enabled (is_enabled)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
