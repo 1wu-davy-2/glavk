@@ -1,10 +1,10 @@
 # glavk 服务器 Docker 部署教程
 
-本文按 Ubuntu 22.04/24.04 编写。默认端口为：前端 `6222`、API `6555`、MariaDB `3307`。MariaDB 默认只绑定服务器本机，浏览器需要访问 API，因此 API 端口必须允许客户端访问。
+本文按 Ubuntu 22.04/24.04 编写。默认端口为：前端 `6222`、API `6555`、MariaDB `3307`。前端 nginx 会在 Docker 内部代理 `/api`，后端和 MariaDB 默认只绑定服务器本机，远程用户只需要访问前端端口。
 
 ## 1. 准备服务器
 
-服务器需要一个客户端可以访问的 IPv4 地址。下面假设服务器地址是 `192.168.1.100`。不要把 `0.0.0.0` 填入 `SERVER_IP`，它只能用于监听，不能作为浏览器访问地址。
+服务器需要一个客户端可以访问的 IPv4 地址。浏览器最终打开 `http://服务器IP:6222`，但这个 IP 不需要填写到配置文件中。
 
 安装 Docker Engine 和 Compose 插件：
 
@@ -30,17 +30,20 @@ git clone https://github.com/1wu-davy-2/glavk.git
 cd glavk
 ```
 
-## 3. 创建唯一配置文件
+## 3. 上传并创建唯一配置文件
+
+将仓库中的 `glavk.env.example` 上传到服务器项目目录。它特意不以点开头，适合 Windows 文件管理器、SFTP 面板和网页上传控件拖动上传。以点开头的 `.env.server.example` 属于隐藏文件，部分上传器默认不显示或会拒绝拖动，因此之前会出现上传失败。
+
+进入项目目录后执行：
 
 ```bash
-cp .env.server.example .env
+cp glavk.env.example .env
 nano .env
 ```
 
-只修改这些值：
+服务器最终只保留并使用项目根目录的 `.env`，前后端不再分别配置。只修改这些值：
 
 ```dotenv
-SERVER_IP=192.168.1.100
 FRONTEND_PORT=6222
 BACKEND_PORT=6555
 MARIADB_PORT=3307
@@ -50,49 +53,35 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=修改为管理员密码
 ```
 
-密码建议只使用字母、数字和 `._-@!`，避免在 `.env` 中使用未转义的空格、`#` 和换行。其余变量保持模板内容即可。
-
-`VITE_API_BASE_URL` 是构建期配置，最终值应为：
-
-```text
-http://192.168.1.100:6555
-```
+密码建议只使用字母、数字和 `._-@!`，避免在 `.env` 中使用未转义的空格、`#` 和换行。其余变量保持模板内容即可。前端通过 nginx 同源转发 `/api`，不需要填写服务器 IP 或 `VITE_API_BASE_URL`。
 
 后端首次启动会把自动生成的 `AUTH_SECRET_KEY`、`CREDENTIAL_ENCRYPTION_KEY` 和 `TRANSPORT_PRIVATE_KEY_B64` 保存到 `backend_data` 卷。不要删除这个卷，否则历史项目密码无法解密，登录 token 也会失效。
 
 ## 4. 防火墙
 
-只开放前端和 API。不要对公网开放 MariaDB 的 `3307`：
+只开放前端端口。后端和 MariaDB 默认绑定服务器本机，不要对公网开放 `6555` 和 `3307`：
 
 ```bash
 sudo ufw allow OpenSSH
 sudo ufw allow 6222/tcp
-sudo ufw allow 6555/tcp
 sudo ufw enable
 sudo ufw status
 ```
 
-如果只允许内网访问 API，可以把第二条替换为实际网段，例如：
-
-```bash
-sudo ufw delete allow 6555/tcp
-sudo ufw allow from 192.168.1.0/24 to any port 6555 proto tcp
-```
-
 ## 5. 检查配置并启动
 
-先让 Compose 展开变量，确认没有残留 `CHANGE-` 或错误 IP：
+先让 Compose 展开变量，确认没有残留 `CHANGE-`：
 
 ```bash
-docker compose --env-file .env config > /tmp/glavk-compose.yml
-grep -E "VITE_API_BASE_URL|CORS_ORIGINS|BACKEND_PORT|FRONTEND_PORT" /tmp/glavk-compose.yml
+docker compose config > /tmp/glavk-compose.yml
+grep -E "BACKEND_BIND_ADDRESS|BACKEND_PORT|FRONTEND_PORT|MARIADB_PORT" /tmp/glavk-compose.yml
 ```
 
 启动服务：
 
 ```bash
-docker compose --env-file .env up -d --build
-docker compose --env-file .env ps
+docker compose up -d --build
+docker compose ps
 ```
 
 首次构建后端镜像会安装 Chromium，可能需要几分钟。等待健康检查：
@@ -107,18 +96,13 @@ curl http://127.0.0.1:6555/api/health
 {"status":"ok","service":"glavk-api"}
 ```
 
-从客户端浏览器打开：
+从客户端浏览器打开前端端口：
 
 ```text
-http://192.168.1.100:6222
+http://服务器IP:6222
 ```
 
-登录后，在浏览器开发者工具 Network 中可以看到请求地址是 `http://192.168.1.100:6555/api/...`。如果仍然请求旧 IP，说明 frontend 没有重新构建，重新执行：
-
-```bash
-docker compose --env-file .env build --no-cache frontend
-docker compose --env-file .env up -d frontend
-```
+登录后，浏览器请求保持同源，由 nginx 转发到后端；不需要重新填写 API 地址。
 
 ## 6. 首次验收
 
@@ -131,8 +115,8 @@ docker compose --env-file .env up -d frontend
 5. 查看 API 和前端日志：
 
 ```bash
-docker compose --env-file .env logs --tail=100 backend
-docker compose --env-file .env logs --tail=100 frontend
+docker compose logs --tail=100 backend
+docker compose logs --tail=100 frontend
 ```
 
 ## 7. 更新和备份
@@ -141,7 +125,7 @@ docker compose --env-file .env logs --tail=100 frontend
 
 ```bash
 mkdir -p backups
-docker compose --env-file .env exec -T mariadb sh -c 'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"' > "backups/glavk-$(date +%Y%m%d-%H%M%S).sql"
+docker compose exec -T mariadb sh -c 'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"' > "backups/glavk-$(date +%Y%m%d-%H%M%S).sql"
 ```
 
 同时备份 Docker 卷中的截图和运行时密钥。先查看卷名：
@@ -160,8 +144,8 @@ docker run --rm -v glavk_backend_data:/data -v "$PWD/backups:/backup" alpine tar
 
 ```bash
 git pull --ff-only
-docker compose --env-file .env up -d --build
-docker compose --env-file .env ps
+docker compose up -d --build
+docker compose ps
 ```
 
 ## 8. 没有 HTTPS 的限制

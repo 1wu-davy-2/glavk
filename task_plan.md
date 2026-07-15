@@ -12,10 +12,11 @@
 
 ## Phase 6: Server deployment configuration
 
-- [x] Add a server-focused `.env` template containing only server IP, ports, database credentials, and admin credentials.
-- [x] Bake the real API origin into the frontend Docker build and derive backend CORS from the same server values.
+- [x] Add one visible `glavk.env.example` template that operators upload and copy to the single root `.env`.
+- [x] Use same-origin `/api` through frontend nginx, so server IP is not a required configuration value.
 - [x] Generate missing production encryption secrets on first backend startup and persist them in `backend_data`.
 - [x] Write the Chinese server deployment tutorial, firewall guidance, health checks, upgrade/backup notes, and HTTP limitation.
+- [x] Keep the backend and MariaDB host bindings local by default; only the frontend port needs firewall exposure.
 - [x] Run configuration tests, backend/frontend tests, and production build; Compose runtime remains blocked by missing Docker CLI.
 
 ---
@@ -47,7 +48,7 @@
 
 ## Phase 5: Docker delivery and verification
 
-- [ ] Add Dockerfiles, Compose services, nginx API proxy, `.env.example`, SQL bootstrap, and README with fixed ports.
+- [ ] Add Dockerfiles, Compose services, nginx API proxy, `glavk.env.example`, SQL bootstrap, and README with fixed ports.
 - [ ] Run backend tests, frontend tests, frontend build, and API smoke checks.
 - [ ] Start Docker services when Docker is available; otherwise verify Compose configuration and report the runtime limitation.
 - [ ] Use browser automation against the local app for login, project creation, password reveal/copy, filtering, and responsive screenshots.

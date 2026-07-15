@@ -25,10 +25,10 @@
 
 ## 2026-07-15
 
-- New request: make server deployment require only IP, ports, database/admin user/password, bake the real API origin into the frontend, and provide a one-pass Docker server tutorial.
-- Decision: keep MariaDB bound to localhost by default, publish the API on the configured host port for browser direct access, derive CORS from the server IP and frontend port, and generate missing production keys into the persistent backend data volume.
+- New request: simplify deployment to one root `.env` and diagnose why the dot-prefixed server template could not be dragged to the server.
+- Decision: use visible `glavk.env.example` as the upload template, copy it to the single root `.env`, use same-origin `/api` through nginx, and bind backend/MariaDB to localhost by default.
 - Next: write failing runtime-secret tests, then implement entrypoint, Compose build args, server `.env` template, and tutorial.
 - Runtime secret TDD completed: missing production keys generate once, existing values are preserved, and shell output is safely quoted.
-- Added `.env.server.example` so operators only edit server IP, ports, database credentials, and admin credentials; Docker Compose derives the frontend API origin and backend CORS.
+- Replaced the two hidden env templates with one visible `glavk.env.example`; server IP and frontend API origin are no longer required because nginx proxies same-origin `/api`.
 - Added backend Docker entrypoint to persist generated secrets in `backend_data`, direct frontend API build args, local-only MariaDB binding, and `docs/docker-deploy-server.md`.
 - Verification: backend `26 passed`, frontend `9 passed`, frontend production build passed, and `git diff --check` passed. Docker CLI and POSIX shell are unavailable in this environment, so real image/Compose execution remains unverified.

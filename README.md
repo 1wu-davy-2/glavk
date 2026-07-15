@@ -11,26 +11,26 @@ glavk 是一个中文网页系统管理后台，用卡片统一管理多个 Web 
 
 ## Docker 部署
 
-服务器部署请直接使用 [服务器 Docker 部署教程](docs/docker-deploy-server.md) 和 `.env.server.example`。只需要修改服务器 IP、端口、数据库账号密码和管理员账号密码；后端会在首次启动时自动生成并持久化三项加密密钥。
+服务器部署请直接使用 [服务器 Docker 部署教程](docs/docker-deploy-server.md) 和 `glavk.env.example`。这是一个可直接上传的可见文件，上传后在服务器目录中复制为 `.env`。只需要修改端口、数据库账号密码和管理员账号密码；后端会在首次启动时自动生成并持久化三项加密密钥。
 
-本地或已经准备好密钥的环境仍可以使用 `.env.example`，然后执行：
+前后端共用项目根目录下的唯一 `.env`。Compose 会把它用于 MariaDB、FastAPI 和前端服务端口，不需要分别准备前后端配置文件；前端 API 使用同源地址，不需要构建期 API 配置：
 
 ```powershell
-Copy-Item .env.example .env
-docker compose --env-file .env up -d --build
+Copy-Item glavk.env.example .env
+docker compose up -d --build
 ```
 
-服务器模式下，前端构建时会把 `VITE_API_BASE_URL` 写成 `http://服务器IP:后端端口`，浏览器会直接请求该 API 地址。修改服务器 IP 或端口后必须重新构建 frontend 镜像。
+生产镜像中的前端使用同源 `/api`，由 nginx 转发到 Compose 内部的 `backend:8000`。后端宿主机端口默认只绑定 `127.0.0.1`，远程用户只需要访问前端端口；这样无需填写服务器 IP，也减少了 HTTP 下暴露 API 的风险。
 
 ## 固定端口
 
 | 服务 | 宿主机端口 | 容器端口 |
 |---|---:|---:|
 | 前端 nginx | 6222 | 80 |
-| FastAPI 后端 | 6555 | 8000 |
+| FastAPI 后端（仅服务器本机） | 6555 | 8000 |
 | MariaDB | 3307 | 3306 |
 
-端口可以通过 `.env` 覆盖，但默认值已经按本项目固定下来。前端 nginx 会把 `/api` 请求转发到 Compose 内部的 `backend:8000`。
+端口可以通过 `.env` 覆盖，但默认值已经按本项目固定下来。前端 nginx 会把 `/api` 请求转发到 Compose 内部的 `backend:8000`。如需从服务器本机调试 API，可访问 `http://127.0.0.1:6555`；不建议把后端端口绑定到公网网卡。
 
 ## 本地开发
 

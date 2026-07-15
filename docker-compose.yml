@@ -33,13 +33,13 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-change-this-before-start}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:-}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://${SERVER_IP:-localhost}:${FRONTEND_PORT:-6222},http://localhost:${FRONTEND_PORT:-6222},http://127.0.0.1:${FRONTEND_PORT:-6222}}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
       TRANSPORT_PRIVATE_KEY_B64: ${TRANSPORT_PRIVATE_KEY_B64:-}
       SCREENSHOT_DIR: ${SCREENSHOT_DIR:-/app/data/screenshots}
       SCREENSHOT_ALLOW_PRIVATE_NETWORKS: ${SCREENSHOT_ALLOW_PRIVATE_NETWORKS:-false}
       GLAVK_RUNTIME_SECRETS_FILE: ${GLAVK_RUNTIME_SECRETS_FILE:-/app/data/runtime-secrets.env}
     ports:
-      - "${BACKEND_PORT:-6555}:8000"
+      - "${BACKEND_BIND_ADDRESS:-127.0.0.1}:${BACKEND_PORT:-6555}:8000"
     volumes:
       - backend_data:/app/data
     healthcheck:
@@ -52,8 +52,6 @@ services:
   frontend:
     build:
       context: ./frontend
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://${SERVER_IP:-localhost}:${BACKEND_PORT:-6555}}
     restart: unless-stopped
     depends_on:
       backend:
