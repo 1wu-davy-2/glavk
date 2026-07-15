@@ -74,6 +74,8 @@ class Settings:
             raise RuntimeError("Replace the default CREDENTIAL_ENCRYPTION_KEY before production startup")
         if not self.transport_private_key_b64:
             raise RuntimeError("TRANSPORT_PRIVATE_KEY_B64 must be set in production")
+        if not self.admin_username.strip() or not self.admin_password:
+            raise RuntimeError("ADMIN_USERNAME and ADMIN_PASSWORD must be set in production")
         try:
             decoded_key = base64.urlsafe_b64decode(self.credential_encryption_key.encode("ascii"))
         except (ValueError, UnicodeEncodeError):

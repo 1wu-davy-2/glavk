@@ -11,39 +11,16 @@ glavk 是一个中文网页系统管理后台，用卡片统一管理多个 Web 
 
 ## Docker 部署
 
-1. 复制环境变量文件并修改其中的数据库密码、管理员密码和三个随机密钥：
+服务器部署请直接使用 [服务器 Docker 部署教程](docs/docker-deploy-server.md) 和 `.env.server.example`。只需要修改服务器 IP、端口、数据库账号密码和管理员账号密码；后端会在首次启动时自动生成并持久化三项加密密钥。
+
+本地或已经准备好密钥的环境仍可以使用 `.env.example`，然后执行：
 
 ```powershell
 Copy-Item .env.example .env
-```
-
-`AUTH_SECRET_KEY` 至少 32 个字符。`CREDENTIAL_ENCRYPTION_KEY` 必须是 Fernet 密钥，可以使用下面的命令生成：
-
-```powershell
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
-
-`TRANSPORT_PRIVATE_KEY_B64` 是应用层凭据传输使用的 RSA 私钥。请为每个部署生成独立值，并完整保存在 `.env` 中：
-
-```powershell
-python -c "import base64; from cryptography.hazmat.primitives.asymmetric import rsa; from cryptography.hazmat.primitives import serialization; key=rsa.generate_private_key(public_exponent=65537,key_size=2048); print(base64.b64encode(key.private_bytes(serialization.Encoding.DER,serialization.PrivateFormat.PKCS8,serialization.NoEncryption())).decode())"
-```
-
-2. 启动全部服务：
-
-```powershell
 docker compose --env-file .env up -d --build
 ```
 
-3. 访问：
-
-- 前端：`http://localhost:6222`
-- 后端健康检查：`http://localhost:6555/api/health`
-- MariaDB：`localhost:3307`
-
-首次启动会按照 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 自动创建管理员账号。修改 `.env` 后需要重新创建或重启 backend 容器；已经创建的管理员不会被覆盖。
-
-首次部署前请将 `.env.example` 中的数据库密码、管理员密码、`AUTH_SECRET_KEY`、`CREDENTIAL_ENCRYPTION_KEY` 和 `TRANSPORT_PRIVATE_KEY_B64` 全部替换为随机或强密码值。
+服务器模式下，前端构建时会把 `VITE_API_BASE_URL` 写成 `http://服务器IP:后端端口`，浏览器会直接请求该 API 地址。修改服务器 IP 或端口后必须重新构建 frontend 镜像。
 
 ## 固定端口
 

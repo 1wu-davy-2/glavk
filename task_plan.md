@@ -8,7 +8,15 @@
 
 **Tech Stack:** React 18 + TypeScript + Vite + lucide-react; Python 3.12 + FastAPI + SQLAlchemy + PyMySQL + cryptography; MariaDB 11; Docker Compose; pytest; Vitest + Testing Library.
 
-**Status:** Complete. Backend, frontend, Docker delivery files, smoke test, and browser verification are finished. Docker runtime validation remains environment-blocked because the Docker CLI is not installed.
+**Status:** Complete. Backend, frontend, Docker delivery files, smoke test, browser verification, and server deployment documentation are finished. Docker runtime validation remains environment-blocked because the Docker CLI is not installed.
+
+## Phase 6: Server deployment configuration
+
+- [x] Add a server-focused `.env` template containing only server IP, ports, database credentials, and admin credentials.
+- [x] Bake the real API origin into the frontend Docker build and derive backend CORS from the same server values.
+- [x] Generate missing production encryption secrets on first backend startup and persist them in `backend_data`.
+- [x] Write the Chinese server deployment tutorial, firewall guidance, health checks, upgrade/backup notes, and HTTP limitation.
+- [x] Run configuration tests, backend/frontend tests, and production build; Compose runtime remains blocked by missing Docker CLI.
 
 ---
 
