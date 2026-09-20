@@ -1,0 +1,5 @@
+# Normalize line endings: shell scripts must stay LF for Docker/Linux.
+*.sh text eol=lf
+*.py text eol=lf
+*.sql text eol=lf
+*.conf text eol=lf

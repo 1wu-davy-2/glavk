@@ -19,7 +19,9 @@ RUN playwright install --with-deps chromium
 COPY app ./app
 COPY sql ./sql
 COPY docker-entrypoint.sh /usr/local/bin/glavk-entrypoint.sh
-RUN chmod 755 /usr/local/bin/glavk-entrypoint.sh
+# Strip Windows CRLF in case the build context came from a Windows checkout/archive,
+# otherwise the shebang "#!/bin/sh\r" breaks with "no such file or directory".
+RUN sed -i 's/\r$//' /usr/local/bin/glavk-entrypoint.sh && chmod 755 /usr/local/bin/glavk-entrypoint.sh
 
 EXPOSE 8000
 
