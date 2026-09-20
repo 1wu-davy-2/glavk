@@ -10,6 +10,9 @@ ENV PLAYWRIGHT_DOWNLOAD_HOST=${PLAYWRIGHT_DOWNLOAD_HOST}
 
 WORKDIR /app
 
+# apt 换国内源（playwright --with-deps 装 Chromium 系统依赖用；海外构建可删除本行）
+RUN sed -i 's@deb.debian.org@mirrors.tuna.tsinghua.edu.cn@g; s@security.debian.org@mirrors.tuna.tsinghua.edu.cn@g' /etc/apt/sources.list.d/debian.sources
+
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 RUN playwright install --with-deps chromium
