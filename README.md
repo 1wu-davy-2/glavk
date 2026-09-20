@@ -11,9 +11,11 @@ glavk 是一个中文网页系统管理后台，用卡片统一管理多个 Web 
 
 ## Docker 部署
 
-服务器部署请直接使用 [服务器 Docker 部署教程](docs/docker-deploy-server.md) 和 `glavk.env.example`。这是一个可直接上传的可见文件，上传后在服务器目录中复制为 `.env`。只需要修改端口、数据库账号密码和管理员账号密码；后端会在首次启动时自动生成并持久化三项加密密钥。
+服务器部署请直接使用 [服务器 Docker 部署教程](docs/docker-deploy-server.md) 和 `glavk.env.example`。这是一个可直接上传的可见文件，上传后在服务器目录中复制为 `.env`。只需要修改端口、数据库连接和管理员账号密码；后端会在首次启动时自动生成并持久化三项加密密钥。
 
-前后端共用项目根目录下的唯一 `.env`。Compose 会把它用于 MariaDB、FastAPI 和前端服务端口，不需要分别准备前后端配置文件；前端 API 使用同源地址，不需要构建期 API 配置：
+数据库默认外接：在 `.env` 中填写数据库四要素 `DB_HOST`（主机 IP）、`DB_PORT`（端口，默认 3306）、`DB_USER`、`DB_PASSWORD`，库名固定为 `glavk`（需先建好库和账号），Compose 不再内置数据库服务。如果想要 Compose 内置 MariaDB，使用 `docker compose --profile bundled-db up -d --build`，四要素填 `DB_HOST=mariadb`、`DB_PORT=3306`、`DB_USER=glavk_user`，`DB_PASSWORD` 与 `MARIADB_PASSWORD` 一致。
+
+前后端共用项目根目录下的唯一 `.env`。Compose 会把它用于 FastAPI 和前端服务端口，不需要分别准备前后端配置文件；前端 API 使用同源地址，不需要构建期 API 配置：
 
 ```powershell
 Copy-Item glavk.env.example .env
@@ -28,7 +30,7 @@ docker compose up -d --build
 |---|---:|---:|
 | 前端 nginx | 6222 | 80 |
 | FastAPI 后端（仅服务器本机） | 6555 | 8000 |
-| MariaDB | 3307 | 3306 |
+| MariaDB（仅内置 profile 时启动） | 3307 | 3306 |
 
 端口可以通过 `.env` 覆盖，但默认值已经按本项目固定下来。前端 nginx 会把 `/api` 请求转发到 Compose 内部的 `backend:8000`。如需从服务器本机调试 API，可访问 `http://127.0.0.1:6555`；不建议把后端端口绑定到公网网卡。
 

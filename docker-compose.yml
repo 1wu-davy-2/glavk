@@ -1,7 +1,16 @@
+# glavk docker compose
+# 数据库默认外接：在项目根 .env 中填写 DB_HOST / DB_PORT / DB_USER / DB_PASSWORD 指向你的 MariaDB。
+# 如需改用 Compose 内置 MariaDB，见下方 mariadb 服务的 profiles 说明。
+
 services:
+  # 可选：内置 MariaDB（默认不启动）。
+  # 启用：docker compose --profile bundled-db up -d --build
+  # 启用后 .env 中数据库四要素填：DB_HOST=mariadb、DB_PORT=3306、DB_USER=glavk_user、
+  # DB_PASSWORD 与下方 MARIADB_PASSWORD 保持一致。
   mariadb:
     image: mariadb:11.8
     restart: unless-stopped
+    profiles: ["bundled-db"]
     environment:
       MARIADB_DATABASE: ${MARIADB_DATABASE:-glavk}
       MARIADB_USER: ${MARIADB_USER:-glavk_user}
@@ -21,12 +30,11 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
-    depends_on:
-      mariadb:
-        condition: service_healthy
     environment:
       APP_ENV: ${APP_ENV:-production}
-      DATABASE_URL: ${DATABASE_URL:-mysql+pymysql://${MARIADB_USER:-glavk_user}:${MARIADB_PASSWORD:-change-me-db-password}@mariadb:3306/${MARIADB_DATABASE:-glavk}?charset=utf8mb4}
+      # 数据库四要素在 .env 中配置：DB_HOST / DB_PORT / DB_USER / DB_PASSWORD，库名固定为 glavk。
+      # 密码请避免 @ : / ? # 等URL特殊字符（其余特殊字符也可能被误解析，建议只用字母数字和 ._-）。
+      DATABASE_URL: mysql+pymysql://${DB_USER:?请在项目根 .env 中设置 DB_USER（数据库用户名）}:${DB_PASSWORD:?请在项目根 .env 中设置 DB_PASSWORD（数据库密码）}@${DB_HOST:?请在项目根 .env 中设置 DB_HOST（数据库主机IP）}:${DB_PORT:-3306}/glavk?charset=utf8mb4
       AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-}
       AUTH_TOKEN_TTL_DAYS: ${AUTH_TOKEN_TTL_DAYS:-30}
       CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-}

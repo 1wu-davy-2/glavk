@@ -1,6 +1,8 @@
 # glavk 服务器 Docker 部署教程
 
-本文按 Ubuntu 22.04/24.04 编写。默认端口为：前端 `6222`、API `6555`、MariaDB `3307`。前端 nginx 会在 Docker 内部代理 `/api`，后端和 MariaDB 默认只绑定服务器本机，远程用户只需要访问前端端口。
+本文按 Ubuntu 22.04/24.04 编写。默认端口为：前端 `6222`、API `6555`。前端 nginx 会在 Docker 内部代理 `/api`，后端默认只绑定服务器本机，远程用户只需要访问前端端口。
+
+数据库默认外接：Compose 不内置 MariaDB，`.env` 中的 `DATABASE_URL` 需要指向你自己的 MariaDB 实例（服务器自装、云数据库或其他容器均可）。如需改用内置数据库，见第 3 步的可选说明。
 
 ## 1. 准备服务器
 
@@ -41,25 +43,36 @@ cp glavk.env.example .env
 nano .env
 ```
 
-服务器最终只保留并使用项目根目录的 `.env`，前后端不再分别配置。只修改这些值：
+服务器最终只保留并使用项目根目录的 `.env`，前后端不再分别配置。必改的是数据库四要素：
+
+```dotenv
+# 必填：指向你自己的 MariaDB，先建好 glavk 库和账号
+DB_HOST=数据库主机IP
+DB_PORT=3306
+DB_USER=数据库账号
+DB_PASSWORD=数据库密码
+```
+
+数据库密码建议只用字母、数字和 `._-`；`@ : / ? #`、空格等字符会破坏连接串解析，不要使用。
+
+端口和管理员账号也建议修改：
 
 ```dotenv
 FRONTEND_PORT=6222
 BACKEND_PORT=6555
-MARIADB_PORT=3307
-MARIADB_PASSWORD=修改为数据库密码
-MARIADB_ROOT_PASSWORD=修改为数据库root密码
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=修改为管理员密码
 ```
 
 密码建议只使用字母、数字和 `._-@!`，避免在 `.env` 中使用未转义的空格、`#` 和换行。其余变量保持模板内容即可。前端通过 nginx 同源转发 `/api`，不需要填写服务器 IP 或 `VITE_API_BASE_URL`。
 
+可选：如果想用 Compose 内置的 MariaDB（不再自己准备数据库），在启动命令上加 `--profile bundled-db`，并把四要素改为 `DB_HOST=mariadb`、`DB_PORT=3306`、`DB_USER=glavk_user`、`DB_PASSWORD` 与 `MARIADB_PASSWORD` 一致，同时修改 `.env` 中的 `MARIADB_PASSWORD` 和 `MARIADB_ROOT_PASSWORD`。内置 MariaDB 宿主机端口为 `3307`，默认只绑定服务器本机。
+
 后端首次启动会把自动生成的 `AUTH_SECRET_KEY`、`CREDENTIAL_ENCRYPTION_KEY` 和 `TRANSPORT_PRIVATE_KEY_B64` 保存到 `backend_data` 卷。不要删除这个卷，否则历史项目密码无法解密，登录 token 也会失效。
 
 ## 4. 防火墙
 
-只开放前端端口。后端和 MariaDB 默认绑定服务器本机，不要对公网开放 `6555` 和 `3307`：
+只开放前端端口。后端默认绑定服务器本机，不要对公网开放 `6555`：
 
 ```bash
 sudo ufw allow OpenSSH
@@ -70,11 +83,11 @@ sudo ufw status
 
 ## 5. 检查配置并启动
 
-先让 Compose 展开变量，确认没有残留 `CHANGE-`：
+先让 Compose 展开变量，确认没有残留 `CHANGE-`。如果 `.env` 忘了填数据库四要素，这一步会直接报错提示：
 
 ```bash
 docker compose config > /tmp/glavk-compose.yml
-grep -E "BACKEND_BIND_ADDRESS|BACKEND_PORT|FRONTEND_PORT|MARIADB_PORT" /tmp/glavk-compose.yml
+grep -E "BACKEND_BIND_ADDRESS|BACKEND_PORT|FRONTEND_PORT|DATABASE_URL" /tmp/glavk-compose.yml
 ```
 
 启动服务：
@@ -121,11 +134,13 @@ docker compose logs --tail=100 frontend
 
 ## 7. 更新和备份
 
-更新代码前先备份数据库：
+数据库不在 Compose 内时，请按你数据库实例自身的方案定期备份 `glavk` 库（例如云数据库自动备份，或 `mariadb-dump` 定时任务）。
+
+使用内置 MariaDB profile 时可以这样导出：
 
 ```bash
 mkdir -p backups
-docker compose exec -T mariadb sh -c 'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"' > "backups/glavk-$(date +%Y%m%d-%H%M%S).sql"
+docker compose --profile bundled-db exec -T mariadb sh -c 'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"' > "backups/glavk-$(date +%Y%m%d-%H%M%S).sql"
 ```
 
 同时备份 Docker 卷中的截图和运行时密钥。先查看卷名：

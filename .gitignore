@@ -17,3 +17,10 @@ frontend/vitest.config.js
 frontend/vitest.config.d.ts
 glavk-desktop.png
 glavk-mobile.png
+# local debug artifacts
+backend/data/
+.shots/
+.smoke_local.py
+.shot_local.py
+.req-local.txt
+.workbuddy/
