@@ -4,6 +4,7 @@ import os
 import base64
 import hashlib
 from dataclasses import dataclass, field
+from urllib.parse import quote_plus
 
 
 def _as_bool(value: str | None, default: bool = False) -> bool:
@@ -12,15 +13,30 @@ def _as_bool(value: str | None, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-@dataclass(frozen=True)
-class Settings:
-    app_env: str = field(default_factory=lambda: os.getenv("APP_ENV", "development"))
-    database_url: str = field(
-        default_factory=lambda: os.getenv(
+def _build_database_url() -> str:
+    """Prefer DB_HOST/DB_PORT/DB_USER/DB_PASSWORD; password is percent-encoded,
+    so values containing @ : / ? # etc. are safe. Falls back to DATABASE_URL."""
+    host = os.getenv("DB_HOST", "").strip()
+    if not host:
+        return os.getenv(
             "DATABASE_URL",
             "mysql+pymysql://glavk_user:change-me@127.0.0.1:3307/glavk?charset=utf8mb4",
         )
+    user = os.getenv("DB_USER", "").strip()
+    password = os.getenv("DB_PASSWORD", "")
+    port = os.getenv("DB_PORT", "3306").strip() or "3306"
+    name = os.getenv("DB_NAME", "glavk").strip() or "glavk"
+    return (
+        "mysql+pymysql://"
+        f"{quote_plus(user)}:{quote_plus(password)}"
+        f"@{host}:{port}/{name}?charset=utf8mb4"
     )
+
+
+@dataclass(frozen=True)
+class Settings:
+    app_env: str = field(default_factory=lambda: os.getenv("APP_ENV", "development"))
+    database_url: str = field(default_factory=_build_database_url)
     auth_secret_key: str = field(
         default_factory=lambda: os.getenv("AUTH_SECRET_KEY", "change-this-secret-key")
     )
