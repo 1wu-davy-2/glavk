@@ -1,12 +1,11 @@
 FROM python:3.12-slim
 
-# 国内镜像加速：pip 走清华源，Playwright 浏览器走 npmmirror。
-# 海外服务器构建时可覆盖回官方源：
-#   docker compose build --build-arg PIP_INDEX_URL=https://pypi.org/simple --build-arg PLAYWRIGHT_DOWNLOAD_HOST=
+# 国内镜像加速：pip 走清华源。apt 与 Playwright Chromium 下载也走官方国内可达通道
+# （apt 见下方 sed；Chromium 默认走 cdn.playwright.dev，国内一般可达，
+#  且 npmmirror 等镜像未同步新版 Chrome-for-Testing，勿设 PLAYWRIGHT_DOWNLOAD_HOST）。
+# 海外服务器构建时可覆盖：--build-arg PIP_INDEX_URL=https://pypi.org/simple
 ARG PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
 ENV PIP_INDEX_URL=${PIP_INDEX_URL}
-ARG PLAYWRIGHT_DOWNLOAD_HOST=https://npmmirror.com/mirrors/playwright
-ENV PLAYWRIGHT_DOWNLOAD_HOST=${PLAYWRIGHT_DOWNLOAD_HOST}
 
 WORKDIR /app
 
