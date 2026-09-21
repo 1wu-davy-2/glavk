@@ -56,3 +56,7 @@ export interface ProjectListResponse {
   items: WebProject[];
   total: number;
 }
+
+export type WorkspaceView = "workbench" | "projects" | "favorites" | "settings";
+
+export type ProjectLayout = "grid" | "list";
