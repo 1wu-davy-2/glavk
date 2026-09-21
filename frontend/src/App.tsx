@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { login } from "./api/client";
 import { clearSession, loadSession, saveSession } from "./auth/session";
 import { LoginPage } from "./components/LoginPage";
-import { DashboardPage } from "./components/DashboardPage";
+import { WorkspacePage } from "./components/WorkspacePage";
 import { clearClientKey } from "./utils/credentialTransport";
 import type { AuthSession } from "./types";
 
@@ -37,7 +37,7 @@ function App() {
     return <LoginPage onLogin={async (username, password) => { const nextSession = await login(username, password); saveSession(nextSession); setSession(nextSession); return nextSession; }} />;
   }
 
-  return <DashboardPage session={session} onLogout={() => { clearClientKey(); clearSession(); setSession(null); }} />;
+  return <WorkspacePage session={session} onLogout={() => { clearClientKey(); clearSession(); setSession(null); }} />;
 }
 
 export default App;

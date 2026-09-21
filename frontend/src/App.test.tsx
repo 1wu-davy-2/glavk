@@ -46,7 +46,8 @@ describe("glavk application shell", () => {
     fireEvent.change(screen.getByLabelText("登录密码"), { target: { value: "admin@123" } });
     fireEvent.click(screen.getByRole("button", { name: "登录" }));
 
-    await waitFor(() => expect(screen.getByRole("heading", { name: "网页系统" })).toBeInTheDocument());
+    // 登录后落在工作台
+    await waitFor(() => expect(screen.getByRole("heading", { name: "工作台" })).toBeInTheDocument());
     expect(localStorage.getItem("glavk.session")).toContain("test-token");
     expect(screen.getByText("还没有网页系统")).toBeInTheDocument();
   });

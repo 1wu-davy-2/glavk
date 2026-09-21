@@ -67,10 +67,12 @@ describe("glavk dashboard workflows", () => {
     login();
 
     await waitFor(() => expect(screen.getByText("客户管理后台")).toBeInTheDocument());
-    expect(screen.getByText("crm-admin")).toBeInTheDocument();
-    expect(screen.getByText("********")).toBeInTheDocument();
+    // 卡片只说明凭证已加密，不再展示用户名和掩码密码
+    expect(screen.getByText(/凭证已加密保存在服务端/)).toBeInTheDocument();
     expect(screen.queryByText("crm-secret")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "复制密码" }));
+    // 复制密码收在卡片右上角的「更多操作」菜单里
+    fireEvent.click(screen.getByRole("button", { name: "更多操作" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "复制密码" }));
 
     await waitFor(() => expect(screen.getByText("密码已复制")).toBeInTheDocument());
     expect(fetchMock).toHaveBeenLastCalledWith("/api/projects/project-1/credential", expect.objectContaining({ headers: expect.any(Headers) }));
