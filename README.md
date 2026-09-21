@@ -128,7 +128,7 @@ npm run dev
 
 Vite 前端默认使用 `6222`，并将 `/api` 代理到 `http://127.0.0.1:6555`。本地开发没有设置 `CREDENTIAL_ENCRYPTION_KEY` 时，会从开发用 `AUTH_SECRET_KEY` 派生稳定密钥；生产环境必须显式设置独立 Fernet 密钥。
 
-本地不设置 `DATABASE_URL` 和 `DB_HOST` 时同样走 SQLite，默认落在工作目录下的 `./data/glavk.sqlite3`。目录会自动创建，表在启动时自动建好；想从头来过直接删掉这个文件即可（连同同目录的 `-wal` / `-shm`）。该文件已被 `.gitignore` 的 `*.sqlite3` 排除，不会误提交。
+本地不设置 `DATABASE_URL` 时同样走 SQLite，默认落在工作目录下的 `./data/glavk.sqlite3`。目录会自动创建，表在启动时自动建好；想从头来过直接删掉这个文件即可（连同同目录的 `-wal` / `-shm`）。该文件已被 `.gitignore` 的 `*.sqlite3` 排除，不会误提交。
 
 截图功能在保存或更新项目后尝试访问公开的 HTTP(S) 地址，固定使用 1280x720 首屏 PNG。截图不使用项目登录凭据，失败不会阻止项目保存，卡片会退回首字母图标。默认拒绝 localhost、私有网段、链路本地地址、保留地址和非 HTTP(S) 地址；只有在可信内网中才可以显式设置 `SCREENSHOT_ALLOW_PRIVATE_NETWORKS=true`。
 
@@ -152,7 +152,7 @@ docker compose config
 - 登录、保存和复制密码使用 RSA-OAEP + AES-GCM 应用层加密；复制动作才在浏览器内存中解密，普通列表和 localStorage 不保存项目密码。只有显式设置 `ALLOW_PLAINTEXT_CREDENTIALS=true` 且浏览器无 WebCrypto 时才退回明文传输。
 - 查看或复制密码需要有效 token；截图接口也需要有效 token。
 - 生产环境不要使用 Compose 默认密钥和默认密码。
-- 数据库备份需要与 MariaDB 数据卷同时保护；项目密码密文依赖 `CREDENTIAL_ENCRYPTION_KEY`，密钥丢失后无法解密历史凭据。
+- 数据库、截图和运行时密钥都在同一个 Docker 卷里，备份和恢复必须整卷一起做；项目密码密文依赖 `CREDENTIAL_ENCRYPTION_KEY`，密钥丢失后无法解密历史凭据。
 
 ## 没有 HTTPS 时的边界
 

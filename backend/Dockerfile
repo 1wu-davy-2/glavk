@@ -17,7 +17,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN playwright install --with-deps chromium
 
 COPY app ./app
-COPY sql ./sql
 COPY docker-entrypoint.sh /usr/local/bin/glavk-entrypoint.sh
 # Strip Windows CRLF in case the build context came from a Windows checkout/archive,
 # otherwise the shebang "#!/bin/sh\r" breaks with "no such file or directory".

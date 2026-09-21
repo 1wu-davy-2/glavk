@@ -4,7 +4,6 @@ import os
 import base64
 import hashlib
 from dataclasses import dataclass, field
-from urllib.parse import quote_plus
 
 
 DEFAULT_SQLITE_URL = "sqlite:///./data/glavk.sqlite3"
@@ -16,27 +15,19 @@ def _as_bool(value: str | None, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def _build_database_url() -> str:
-    """默认使用本地 SQLite 文件；设置 DB_HOST 时改用 MySQL/MariaDB，密码会做
-    percent-encoding，因此可以包含 @ : / ? # 等字符；也可以用 DATABASE_URL 直接指定。"""
-    host = os.getenv("DB_HOST", "").strip()
-    if not host:
-        return os.getenv("DATABASE_URL", DEFAULT_SQLITE_URL)
-    user = os.getenv("DB_USER", "").strip()
-    password = os.getenv("DB_PASSWORD", "")
-    port = os.getenv("DB_PORT", "3306").strip() or "3306"
-    name = os.getenv("DB_NAME", "glavk").strip() or "glavk"
-    return (
-        "mysql+pymysql://"
-        f"{quote_plus(user)}:{quote_plus(password)}"
-        f"@{host}:{port}/{name}?charset=utf8mb4"
-    )
+def _database_url() -> str:
+    """SQLite 是唯一的数据库：默认是工作目录下的本地文件，用 DATABASE_URL 覆盖路径。
+
+    容器里要写成绝对路径 `sqlite:////app/data/glavk.sqlite3`（四个斜杠），
+    相对路径会落在容器可写层，容器一重建就没了。
+    """
+    return os.getenv("DATABASE_URL", DEFAULT_SQLITE_URL)
 
 
 @dataclass(frozen=True)
 class Settings:
     app_env: str = field(default_factory=lambda: os.getenv("APP_ENV", "development"))
-    database_url: str = field(default_factory=_build_database_url)
+    database_url: str = field(default_factory=_database_url)
     auth_secret_key: str = field(
         default_factory=lambda: os.getenv("AUTH_SECRET_KEY", "change-this-secret-key")
     )

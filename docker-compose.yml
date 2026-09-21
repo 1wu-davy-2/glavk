@@ -2,8 +2,6 @@
 # 数据库就是容器里的一个文件：/app/data/glavk.sqlite3，落在 backend_data 卷上。
 # 重建镜像（docker compose up -d --build）不会动这个卷，数据不会丢；
 # 会丢数据的是 docker compose down -v 和 docker volume rm，见 README「数据持久化」一节。
-# 如需改回外部 MySQL/MariaDB，在 .env 里把 DATABASE_URL 设成
-# mysql+pymysql://user:password@host:3306/glavk?charset=utf8mb4 即可，其余不用改。
 
 services:
   backend:

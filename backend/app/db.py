@@ -45,11 +45,12 @@ def _enable_sqlite_pragmas(engine) -> None:
 
 
 def ensure_schema(engine) -> None:
+    """建表，并给已存在的旧库补上后来新增的列（create_all 不会改已存在的表）。"""
     Base.metadata.create_all(engine)
     columns = {column["name"] for column in inspect(engine).get_columns("web_projects")}
     if "screenshot_path" not in columns:
         with engine.begin() as connection:
-            connection.execute(text("ALTER TABLE web_projects ADD COLUMN screenshot_path VARCHAR(500) NULL"))
+            connection.execute(text("ALTER TABLE web_projects ADD COLUMN screenshot_path VARCHAR(500)"))
 
 
 def create_session_factory(database_url: str):

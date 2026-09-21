@@ -64,8 +64,6 @@ ADMIN_PASSWORD=修改为管理员密码
 
 如果服务器只能用 `http://IP:6222` 访问（没有 HTTPS），还要把 `ALLOW_PLAINTEXT_CREDENTIALS` 设为 `true`，否则浏览器不提供 WebCrypto，登录页点登录就会报错，见第 8.1 节。
 
-想改回外部 MySQL/MariaDB，把 `DATABASE_URL` 换成 `mysql+pymysql://账号:密码@主机:3306/glavk?charset=utf8mb4` 即可，代码和 compose 都不用改；密码里的 `@ : / ? #` 由后端自动做 URL 编码。
-
 后端首次启动会把自动生成的 `AUTH_SECRET_KEY`、`CREDENTIAL_ENCRYPTION_KEY` 和 `TRANSPORT_PRIVATE_KEY_B64` 保存到 `backend_data` 卷。**这个卷现在还装着 SQLite 数据库本体**，所以不要删除它：删掉不仅历史项目密码无法解密、登录 token 失效，所有项目数据也会一起消失。
 
 ## 4. 防火墙
