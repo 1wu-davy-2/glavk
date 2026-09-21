@@ -2,7 +2,7 @@
 
 本文按 Ubuntu 22.04/24.04 编写。默认端口为：前端 `6222`、API `6555`。前端 nginx 会在 Docker 内部代理 `/api`，后端默认只绑定服务器本机，远程用户只需要访问前端端口。
 
-数据库默认外接：Compose 不内置 MariaDB，`.env` 中的 `DATABASE_URL` 需要指向你自己的 MariaDB 实例（服务器自装、云数据库或其他容器均可）。如需改用内置数据库，见第 3 步的可选说明。
+数据库开箱即用：SQLite 把整个库放在容器内的 `/app/data/glavk.sqlite3`，不需要另外安装或配置数据库服务，也没有账号密码要填。这个文件存在 `backend_data` 卷里，哪些操作安全、哪些会丢数据、怎么备份，见第 7 步。
 
 ## 1. 准备服务器
 
@@ -43,19 +43,15 @@ cp glavk.env.example .env
 nano .env
 ```
 
-服务器最终只保留并使用项目根目录的 `.env`，前后端不再分别配置。必改的是数据库四要素：
+服务器最终只保留并使用项目根目录的 `.env`，前后端不再分别配置。**数据库不需要任何配置**，保持模板里的默认值就行：
 
 ```dotenv
-# 必填：指向你自己的 MariaDB，先建好 glavk 库和账号
-DB_HOST=数据库主机IP
-DB_PORT=3306
-DB_USER=数据库账号
-DB_PASSWORD=数据库密码
+DATABASE_URL=sqlite:////app/data/glavk.sqlite3
 ```
 
-数据库密码可以包含 `@ : / ? #` 等任意字符——后端会自动做 URL 编码，按原样填写即可。
+注意是**四个斜杠**：`sqlite://` 后面跟的是容器内的绝对路径 `/app/data/...`。少写一个斜杠会变成相对路径，容器一重建数据就没了。
 
-端口和管理员账号也建议修改：
+端口和管理员账号建议修改：
 
 ```dotenv
 FRONTEND_PORT=6222
@@ -66,9 +62,9 @@ ADMIN_PASSWORD=修改为管理员密码
 
 密码建议只使用字母、数字和 `._-@!`，避免在 `.env` 中使用未转义的空格、`#` 和换行。其余变量保持模板内容即可。前端通过 nginx 同源转发 `/api`，不需要填写服务器 IP 或 `VITE_API_BASE_URL`。
 
-可选：如果想用 Compose 内置的 MariaDB（不再自己准备数据库），在启动命令上加 `--profile bundled-db`，并把四要素改为 `DB_HOST=mariadb`、`DB_PORT=3306`、`DB_USER=glavk_user`、`DB_PASSWORD` 与 `MARIADB_PASSWORD` 一致，同时修改 `.env` 中的 `MARIADB_PASSWORD` 和 `MARIADB_ROOT_PASSWORD`。内置 MariaDB 宿主机端口为 `3307`，默认只绑定服务器本机。
+如果服务器只能用 `http://IP:6222` 访问（没有 HTTPS），还要把 `ALLOW_PLAINTEXT_CREDENTIALS` 设为 `true`，否则浏览器不提供 WebCrypto，登录页点登录就会报错，见第 8.1 节。
 
-后端首次启动会把自动生成的 `AUTH_SECRET_KEY`、`CREDENTIAL_ENCRYPTION_KEY` 和 `TRANSPORT_PRIVATE_KEY_B64` 保存到 `backend_data` 卷。不要删除这个卷，否则历史项目密码无法解密，登录 token 也会失效。
+后端首次启动会把自动生成的 `AUTH_SECRET_KEY`、`CREDENTIAL_ENCRYPTION_KEY` 和 `TRANSPORT_PRIVATE_KEY_B64` 保存到 `backend_data` 卷。**这个卷现在还装着 SQLite 数据库本体**，所以不要删除它：删掉不仅历史项目密码无法解密、登录 token 失效，所有项目数据也会一起消失。
 
 ## 4. 防火墙
 
@@ -83,12 +79,14 @@ sudo ufw status
 
 ## 5. 检查配置并启动
 
-先让 Compose 展开变量，确认没有残留 `CHANGE-`。如果 `.env` 忘了填数据库四要素，这一步会直接报错提示：
+先让 Compose 展开变量，确认没有残留 `CHANGE-`：
 
 ```bash
 docker compose config > /tmp/glavk-compose.yml
 grep -E "BACKEND_BIND_ADDRESS|BACKEND_PORT|FRONTEND_PORT|DATABASE_URL" /tmp/glavk-compose.yml
 ```
+
+重点确认 `DATABASE_URL` 展开后是 `sqlite:////app/data/glavk.sqlite3`（四个斜杠、绝对路径）。
 
 启动服务：
 
@@ -134,25 +132,41 @@ docker compose logs --tail=100 frontend
 
 ## 7. 更新和备份
 
-数据库不在 Compose 内时，请按你数据库实例自身的方案定期备份 `glavk` 库（例如云数据库自动备份，或 `mariadb-dump` 定时任务）。
+数据库、截图和运行时密钥都在同一个卷里，备份这个卷就等于备份全部数据。先确认卷名：
 
-使用内置 MariaDB profile 时可以这样导出：
+```bash
+docker volume ls | grep backend_data      # 默认是 glavk_backend_data
+```
+
+SQLite 写入时会产生 `glavk.sqlite3-wal` 和 `glavk.sqlite3-shm`，**必须和主文件一起打包**，所以停几秒后端再备份：
 
 ```bash
 mkdir -p backups
-docker compose --profile bundled-db exec -T mariadb sh -c 'mariadb-dump -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"' > "backups/glavk-$(date +%Y%m%d-%H%M%S).sql"
+docker compose stop backend
+docker run --rm -v glavk_backend_data:/data -v "$PWD/backups:/backup" \
+  alpine tar czf /backup/glavk-data-$(date +%Y%m%d-%H%M%S).tar.gz -C /data .
+docker compose start backend
 ```
 
-同时备份 Docker 卷中的截图和运行时密钥。先查看卷名：
+恢复：
 
 ```bash
-docker volume ls | grep backend_data
+docker compose down
+docker run --rm -v glavk_backend_data:/data -v "$PWD/backups:/backup" \
+  alpine sh -c 'find /data -mindepth 1 -delete && tar xzf /backup/glavk-data-20260921-120000.tar.gz -C /data'
+docker compose up -d
 ```
 
-然后将实际卷名替换到备份命令：
+注意：只恢复数据库文件而丢了 `runtime-secrets.env` 里的 `CREDENTIAL_ENCRYPTION_KEY`，已保存的项目密码就永远解不开了，所以务必整卷一起备份、一起恢复。
+
+**日常操作里只有两条会丢数据**：`docker compose down -v`（`-v` 会连卷一起删）和 `docker volume rm <卷名>`。`docker compose up -d --build`、`restart`、`down`（不带 `-v`）都不会动数据。另外卷名带项目目录前缀，把仓库换到别的目录（比如 `glavk-dev`）会挂上一个全新的空卷，看起来就像数据被覆盖了——完整的说明和排查方法见 README 的「数据持久化」一节。
+
+完全清空重来：
 
 ```bash
-docker run --rm -v glavk_backend_data:/data -v "$PWD/backups:/backup" alpine tar czf /backup/glavk-backend-data-$(date +%Y%m%d-%H%M%S).tar.gz -C /data .
+docker compose down
+docker volume rm glavk_backend_data
+docker compose up -d --build
 ```
 
 更新：

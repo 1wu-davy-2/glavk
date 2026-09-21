@@ -3,3 +3,8 @@
 *.py text eol=lf
 *.sql text eol=lf
 *.conf text eol=lf
+
+# .env 模板和 compose 文件同样要 LF：CRLF 会让 .env 的每个值尾部带上 \r，
+# 在服务器上可能表现为密码、密钥莫名其妙不匹配。
+glavk.env.example text eol=lf
+docker-compose.yml text eol=lf

@@ -19,6 +19,8 @@ glavk-desktop.png
 glavk-mobile.png
 # local debug artifacts
 backend/data/
+# 本地开发时从仓库根目录启动后端会生成：SQLite 库 + 截图（截图里可能含真实系统页面）
+/data/
 .shots/
 .smoke_local.py
 .shot_local.py
