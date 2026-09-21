@@ -7,6 +7,9 @@ from dataclasses import dataclass, field
 from urllib.parse import quote_plus
 
 
+DEFAULT_SQLITE_URL = "sqlite:///./data/glavk.sqlite3"
+
+
 def _as_bool(value: str | None, default: bool = False) -> bool:
     if value is None:
         return default
@@ -14,14 +17,11 @@ def _as_bool(value: str | None, default: bool = False) -> bool:
 
 
 def _build_database_url() -> str:
-    """Prefer DB_HOST/DB_PORT/DB_USER/DB_PASSWORD; password is percent-encoded,
-    so values containing @ : / ? # etc. are safe. Falls back to DATABASE_URL."""
+    """默认使用本地 SQLite 文件；设置 DB_HOST 时改用 MySQL/MariaDB，密码会做
+    percent-encoding，因此可以包含 @ : / ? # 等字符；也可以用 DATABASE_URL 直接指定。"""
     host = os.getenv("DB_HOST", "").strip()
     if not host:
-        return os.getenv(
-            "DATABASE_URL",
-            "mysql+pymysql://glavk_user:change-me@127.0.0.1:3307/glavk?charset=utf8mb4",
-        )
+        return os.getenv("DATABASE_URL", DEFAULT_SQLITE_URL)
     user = os.getenv("DB_USER", "").strip()
     password = os.getenv("DB_PASSWORD", "")
     port = os.getenv("DB_PORT", "3306").strip() or "3306"

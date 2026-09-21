@@ -1,43 +1,20 @@
-# glavk docker compose
-# 数据库默认外接：在项目根 .env 中填写 DB_HOST / DB_PORT / DB_USER / DB_PASSWORD 指向你的 MariaDB。
-# 如需改用 Compose 内置 MariaDB，见下方 mariadb 服务的 profiles 说明。
+# glavk docker compose（SQLite 版本）
+# 数据库就是容器里的一个文件：/app/data/glavk.sqlite3，落在 backend_data 卷上。
+# 重建镜像（docker compose up -d --build）不会动这个卷，数据不会丢；
+# 会丢数据的是 docker compose down -v 和 docker volume rm，见 README「数据持久化」一节。
+# 如需改回外部 MySQL/MariaDB，在 .env 里把 DATABASE_URL 设成
+# mysql+pymysql://user:password@host:3306/glavk?charset=utf8mb4 即可，其余不用改。
 
 services:
-  # 可选：内置 MariaDB（默认不启动）。
-  # 启用：docker compose --profile bundled-db up -d --build
-  # 启用后 .env 中数据库四要素填：DB_HOST=mariadb、DB_PORT=3306、DB_USER=glavk_user、
-  # DB_PASSWORD 与下方 MARIADB_PASSWORD 保持一致。
-  mariadb:
-    image: mariadb:11.8
-    restart: unless-stopped
-    profiles: ["bundled-db"]
-    environment:
-      MARIADB_DATABASE: ${MARIADB_DATABASE:-glavk}
-      MARIADB_USER: ${MARIADB_USER:-glavk_user}
-      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-change-me-db-password}
-      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-change-me-root-password}
-    ports:
-      - "${MARIADB_BIND_ADDRESS:-127.0.0.1}:${MARIADB_PORT:-3307}:3306"
-    volumes:
-      - mariadb_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-
   backend:
     build:
       context: ./backend
     restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV:-production}
-      # 数据库四要素在 .env 中配置：DB_HOST / DB_PORT / DB_USER / DB_PASSWORD，库名固定为 glavk。
-      # 由后端自行拼接连接串并做 URL 编码，密码中可以包含 @ : / ? # 等任意字符。
-      DB_HOST: ${DB_HOST:?请在项目根 .env 中设置 DB_HOST（数据库主机IP）}
-      DB_PORT: ${DB_PORT:-3306}
-      DB_USER: ${DB_USER:?请在项目根 .env 中设置 DB_USER（数据库用户名）}
-      DB_PASSWORD: ${DB_PASSWORD:?请在项目根 .env 中设置 DB_PASSWORD（数据库密码）}
+      # SQLite 数据文件必须留在 /app/data（即 backend_data 卷）里，
+      # 改成卷外的路径，容器一重建数据就没了。
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////app/data/glavk.sqlite3}
       AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-}
       AUTH_TOKEN_TTL_DAYS: ${AUTH_TOKEN_TTL_DAYS:-30}
       CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY:-}
@@ -74,5 +51,4 @@ services:
       - "${FRONTEND_PORT:-6222}:80"
 
 volumes:
-  mariadb_data:
   backend_data:
