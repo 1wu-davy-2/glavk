@@ -20,7 +20,8 @@ class CredentialData(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    credential_envelope: CredentialEnvelope
+    credential_envelope: CredentialEnvelope | None = None
+    credential_plaintext: CredentialData | None = None
 
 
 class AuthUserRead(BaseModel):
@@ -43,6 +44,7 @@ class ProjectCreate(BaseModel):
     description: str = Field(default="", max_length=300)
     notes: str = Field(default="", max_length=5000)
     credential_envelope: CredentialEnvelope | None = None
+    credential_plaintext: CredentialData | None = None
     is_favorite: bool = False
     is_enabled: bool = True
     sort_order: int = Field(default=0, ge=0, le=100000)
@@ -63,6 +65,7 @@ class ProjectUpdate(BaseModel):
     description: str | None = Field(default=None, max_length=300)
     notes: str | None = Field(default=None, max_length=5000)
     credential_envelope: CredentialEnvelope | None = None
+    credential_plaintext: CredentialData | None = None
     is_favorite: bool | None = None
     is_enabled: bool | None = None
     sort_order: int | None = Field(default=None, ge=0, le=100000)
@@ -103,4 +106,5 @@ class ProjectListResponse(BaseModel):
 
 class CredentialRead(BaseModel):
     project_id: str
-    envelope: CredentialEnvelope
+    envelope: CredentialEnvelope | None = None
+    credential: CredentialData | None = None

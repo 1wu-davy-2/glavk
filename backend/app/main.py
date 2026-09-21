@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,10 +17,17 @@ from .screenshot_service import ScreenshotService
 from .transport_crypto import TransportCrypto
 from . import models  # noqa: F401
 
+logger = logging.getLogger(__name__)
+
 
 def create_app(*, settings: Settings | None = None, session_factory=None, screenshot_service=None) -> FastAPI:
     app_settings = settings or Settings()
     app_settings.validate_production_security()
+    if app_settings.allow_plaintext_credentials:
+        logger.warning(
+            "ALLOW_PLAINTEXT_CREDENTIALS is enabled: login and project credentials are accepted "
+            "in cleartext, so anyone sniffing the HTTP link can read them"
+        )
     engine = None
     if session_factory is None:
         engine, session_factory = create_session_factory(app_settings.database_url)

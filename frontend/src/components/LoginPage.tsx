@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { ArrowRight, Eye, EyeOff, KeyRound, ShieldCheck } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, KeyRound, ShieldAlert, ShieldCheck } from "lucide-react";
 
 import type { AuthSession } from "../types";
+import { isTransportCryptoAvailable } from "../utils/credentialTransport";
 
 interface LoginPageProps {
   onLogin: (username: string, password: string) => Promise<AuthSession>;
@@ -13,6 +14,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const canEncrypt = isTransportCryptoAvailable();
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,7 +55,11 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             {isSubmitting ? "登录中..." : "登录"} <ArrowRight size={17} />
           </button>
         </form>
-        <div className="auth-footnote"><span /><ShieldCheck size={14} /> 安全连接 · 管理员入口 <span /></div>
+        <div className="auth-footnote">
+          <span />
+          {canEncrypt ? <><ShieldCheck size={14} /> 安全连接 · 管理员入口</> : <><ShieldAlert size={14} /> 明文传输 · 请在可信网络使用</>}
+          <span />
+        </div>
       </section>
     </main>
   );

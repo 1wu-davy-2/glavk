@@ -4,6 +4,15 @@ export type { CredentialEnvelope, CredentialPayload } from "../types";
 
 let clientKeyPair: CryptoKeyPair | null = null;
 
+/**
+ * 浏览器只在安全上下文（HTTPS、localhost、127.0.0.1）暴露 crypto.subtle。
+ * 纯 HTTP + IP 访问时它是 undefined，任何 WebCrypto 调用都会抛 TypeError，
+ * 因此调用方必须先判断这里的返回值，再决定走加密还是明文通道。
+ */
+export function isTransportCryptoAvailable(): boolean {
+  return typeof crypto !== "undefined" && typeof crypto.subtle !== "undefined";
+}
+
 function bytesToBase64(bytes: ArrayBuffer | ArrayBufferView): string {
   const view = ArrayBuffer.isView(bytes)
     ? new Uint8Array(bytes.buffer as ArrayBuffer, bytes.byteOffset, bytes.byteLength)

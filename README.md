@@ -11,7 +11,7 @@ glavk 是一个中文网页系统管理后台，用卡片统一管理多个 Web 
 
 ## Docker 部署
 
-服务器部署请直接使用 [服务器 Docker 部署教程](docs/docker-deploy-server.md) 和 `glavk.env.example`。这是一个可直接上传的可见文件，上传后在服务器目录中复制为 `.env`。只需要修改端口、数据库连接和管理员账号密码；后端会在首次启动时自动生成并持久化三项加密密钥。
+服务器部署请直接使用 [服务器 Docker 部署教程](docs/docker-deploy-server.md) 和 `glavk.env.example`。这是一个可直接上传的可见文件，上传后在服务器目录中复制为 `.env`。只需要修改端口、数据库连接和管理员账号密码；后端会在首次启动时自动生成并持久化三项加密密钥。纯 HTTP（没有 HTTPS）部署还要把 `ALLOW_PLAINTEXT_CREDENTIALS` 设为 `true`，否则登录会失败，见下文"没有 HTTPS 时的边界"。
 
 数据库默认外接：在 `.env` 中填写数据库四要素 `DB_HOST`（主机 IP）、`DB_PORT`（端口，默认 3306）、`DB_USER`、`DB_PASSWORD`，库名固定为 `glavk`（需先建好库和账号），Compose 不再内置数据库服务。如果想要 Compose 内置 MariaDB，使用 `docker compose --profile bundled-db up -d --build`，四要素填 `DB_HOST=mariadb`、`DB_PORT=3306`、`DB_USER=glavk_user`，`DB_PASSWORD` 与 `MARIADB_PASSWORD` 一致。
 
@@ -72,7 +72,7 @@ docker compose config
 
 - 管理员登录密码只保存 PBKDF2-HMAC 哈希。
 - Web 系统密码使用 Fernet 加密保存，普通项目列表不会返回明文密码。
-- 登录、保存和复制密码使用 RSA-OAEP + AES-GCM 应用层加密；复制动作才在浏览器内存中解密，普通列表和 localStorage 不保存项目密码。
+- 登录、保存和复制密码使用 RSA-OAEP + AES-GCM 应用层加密；复制动作才在浏览器内存中解密，普通列表和 localStorage 不保存项目密码。只有显式设置 `ALLOW_PLAINTEXT_CREDENTIALS=true` 且浏览器无 WebCrypto 时才退回明文传输。
 - 查看或复制密码需要有效 token；截图接口也需要有效 token。
 - 生产环境不要使用 Compose 默认密钥和默认密码。
 - 数据库备份需要与 MariaDB 数据卷同时保护；项目密码密文依赖 `CREDENTIAL_ENCRYPTION_KEY`，密钥丢失后无法解密历史凭据。
@@ -80,3 +80,11 @@ docker compose config
 ## 没有 HTTPS 时的边界
 
 没有域名和证书时，HTTP 无法防御主动中间人替换前端脚本，也无法保证公网链路的完整性。应用层加密只能降低普通被动抓包直接得到密码的风险，不能替代 HTTPS。无 HTTPS 时请只在 localhost、可信内网或 VPN/Tailscale 内使用；公网部署必须在前置反向代理配置 HTTPS。
+
+浏览器只在安全上下文（HTTPS、`localhost`、`127.0.0.1`）暴露 WebCrypto，所以用 `http://服务器IP:6222` 访问时前端拿不到 `crypto.subtle`，无法加密凭据，登录会失败。纯 HTTP 部署需要在 `.env` 中显式开启明文通道：
+
+```ini
+ALLOW_PLAINTEXT_CREDENTIALS=true
+```
+
+开启后前端在没有 `crypto.subtle` 时退回明文提交，功能完整可用；能加密时（HTTPS 或 localhost）仍然优先走加密通道。代价是 HTTP 链路上的密码和 token 都是明文，请只在自用、可信网络下开启，详细说明见[部署教程第 8 节](docs/docker-deploy-server.md)。

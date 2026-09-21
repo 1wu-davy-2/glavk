@@ -102,6 +102,7 @@ class ProjectService:
         project = self._get_or_404(session, project_id)
         values = payload.model_dump(exclude_unset=True)
         values.pop("credential_envelope", None)
+        values.pop("credential_plaintext", None)
         for key, value in values.items():
             if isinstance(value, str):
                 value = value.strip()

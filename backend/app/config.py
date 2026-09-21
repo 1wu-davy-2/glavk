@@ -63,6 +63,11 @@ class Settings:
     screenshot_allow_private_networks: bool = field(
         default_factory=lambda: _as_bool(os.getenv("SCREENSHOT_ALLOW_PRIVATE_NETWORKS"))
     )
+    # HTTP（非安全上下文）下浏览器不提供 crypto.subtle，前端无法做应用层加密。
+    # 打开后允许前端以明文提交登录/项目凭据，仅在纯 HTTP 自用环境开启。
+    allow_plaintext_credentials: bool = field(
+        default_factory=lambda: _as_bool(os.getenv("ALLOW_PLAINTEXT_CREDENTIALS"))
+    )
 
     @property
     def auth_token_ttl_seconds(self) -> int:

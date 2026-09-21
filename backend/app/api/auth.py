@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from ..auth import AuthenticatedUser, require_current_user
-from ..schemas import AuthUserRead, CredentialData, LoginRequest, TokenResponse
+from ..schemas import AuthUserRead, LoginRequest, TokenResponse
+from .credentials import resolve_credentials
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -20,26 +21,34 @@ def get_session(request: Request) -> Generator[Session, None, None]:
         session.close()
 
 
+def invalid_credentials() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="用户名或密码错误",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, request: Request, session: Session = Depends(get_session)):
     auth_service = request.app.state.auth_service
     try:
-        credential_data = CredentialData.model_validate(
-            request.app.state.transport_crypto.decrypt_envelope(payload.credential_envelope.model_dump())
+        credential_data = resolve_credentials(
+            request,
+            payload.credential_envelope,
+            payload.credential_plaintext,
+            required=True,
         )
-    except ValueError as error:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) from error
+    except HTTPException as error:
+        # 明文通道未开启属于部署配置问题，必须把原因原样告诉前端，不能混成“用户名或密码错误”
+        if error.status_code == status.HTTP_400_BAD_REQUEST:
+            raise
+        raise invalid_credentials() from error
+    if credential_data is None:
+        raise invalid_credentials()
     user = auth_service.authenticate(session, credential_data.username, credential_data.password or "")
     if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="用户名或密码错误",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise invalid_credentials()
     token, expires_in, expires_at = auth_service.create_access_token(user.username)
     return TokenResponse(
         access_token=token,

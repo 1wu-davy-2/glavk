@@ -10,7 +10,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ..auth import AuthenticatedUser, require_current_user
-from ..schemas import CredentialData, CredentialEnvelope, CredentialRead, ProjectCreate, ProjectListResponse, ProjectRead, ProjectUpdate
+from ..schemas import CredentialEnvelope, CredentialRead, ProjectCreate, ProjectListResponse, ProjectRead, ProjectUpdate
+from .credentials import require_plaintext_credentials, resolve_credentials
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 logger = logging.getLogger(__name__)
@@ -22,17 +23,6 @@ def get_session(request: Request) -> Generator[Session, None, None]:
         yield session
     finally:
         session.close()
-
-
-def decrypt_credentials(request: Request, envelope: CredentialEnvelope | None) -> CredentialData | None:
-    if envelope is None:
-        return None
-    try:
-        return CredentialData.model_validate(
-            request.app.state.transport_crypto.decrypt_envelope(envelope.model_dump())
-        )
-    except ValueError as error:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="凭据数据无效") from error
 
 
 def capture_project_screenshot(request: Request, session: Session, project_id: str, url: str) -> None:
@@ -70,7 +60,7 @@ def create_project(
     project = request.app.state.project_service.create(
         session,
         payload,
-        decrypt_credentials(request, payload.credential_envelope),
+        resolve_credentials(request, payload.credential_envelope, payload.credential_plaintext),
     )
     capture_project_screenshot(request, session, project.id, project.url)
     return request.app.state.project_service.get(session, project.id)
@@ -98,7 +88,7 @@ def update_project(
         session,
         project_id,
         payload,
-        decrypt_credentials(request, payload.credential_envelope),
+        resolve_credentials(request, payload.credential_envelope, payload.credential_plaintext),
     )
     capture_project_screenshot(request, session, project.id, project.url)
     return request.app.state.project_service.get(session, project.id)
@@ -108,14 +98,19 @@ def update_project(
 def reveal_credential(
     project_id: str,
     request: Request,
-    client_public_key: str = Header(alias="X-Client-Public-Key"),
+    client_public_key: str | None = Header(default=None, alias="X-Client-Public-Key"),
     _: AuthenticatedUser = Depends(require_current_user),
     session: Session = Depends(get_session),
 ):
+    credentials = request.app.state.project_service.credentials(session, project_id)
+    if not client_public_key:
+        # 浏览器没有 WebCrypto（HTTP 非安全上下文）时取不到客户端公钥，只能明文回传
+        require_plaintext_credentials(request)
+        return CredentialRead(project_id=project_id, credential=credentials)
     try:
         client_key_der = base64.b64decode(client_public_key, validate=True)
         envelope = request.app.state.transport_crypto.encrypt_for_client(
-            request.app.state.project_service.credentials(session, project_id).model_dump(),
+            credentials.model_dump(),
             client_key_der,
         )
         return CredentialRead(project_id=project_id, envelope=CredentialEnvelope.model_validate(envelope))

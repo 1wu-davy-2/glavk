@@ -166,3 +166,23 @@ docker compose ps
 ## 8. 没有 HTTPS 的限制
 
 没有域名和证书时，HTTP 不能防止主动中间人替换前端 JavaScript。项目的 RSA-OAEP + AES-GCM 只降低普通被动抓包直接得到密码的风险，不能替代 HTTPS。没有 HTTPS 时只建议在 localhost、可信内网或 VPN/Tailscale 中使用；公网使用必须在反向代理前配置 HTTPS。
+
+### 8.1 纯 HTTP 访问必须开启 ALLOW_PLAINTEXT_CREDENTIALS
+
+浏览器只在**安全上下文**（HTTPS、`localhost`、`127.0.0.1`）暴露 WebCrypto，也就是 `crypto.subtle`。用 `http://服务器IP:6222` 打开时 `crypto.subtle` 是 `undefined`，前端无法做任何加密，登录会直接失败（表现为 `Cannot read properties of undefined (reading 'importKey')`）。
+
+为此后端提供一个显式开关，默认关闭：
+
+```ini
+ALLOW_PLAINTEXT_CREDENTIALS=true
+```
+
+开启后：
+
+- 前端检测不到 `crypto.subtle` 时，登录、保存项目凭据、复制密码改为明文提交，功能全部可用；登录页底部会显示"明文传输 · 请在可信网络使用"。
+- 只要浏览器能加密（HTTPS 或 localhost 访问），仍然优先走 RSA-OAEP + AES-GCM 加密通道，该开关不影响加密路径。
+- 后端启动日志会打印一条 warning 提示当前处于明文模式。
+
+安全代价：HTTP 链路上的登录密码和项目密码是明文，任何能被动抓包的人都能直接读到；同时 `Authorization` token 也在明文 HTTP 中传输，拿到即可访问全部数据。因此**只在自用、可信网络下开启**；公网可访问的部署请配置 HTTPS 并保持该项为 `false`。
+
+没有 HTTPS 时前端的 `navigator.clipboard` 同样不可用，复制密码会自动退回旧的 `document.execCommand("copy")`，不需要额外配置。

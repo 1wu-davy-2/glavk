@@ -48,6 +48,9 @@ services:
       TRANSPORT_PRIVATE_KEY_B64: ${TRANSPORT_PRIVATE_KEY_B64:-}
       SCREENSHOT_DIR: ${SCREENSHOT_DIR:-/app/data/screenshots}
       SCREENSHOT_ALLOW_PRIVATE_NETWORKS: ${SCREENSHOT_ALLOW_PRIVATE_NETWORKS:-false}
+      # 纯 HTTP 访问时浏览器不提供 WebCrypto，登录将无法加密凭据。
+      # 自用 HTTP 环境设为 true；有 HTTPS 的部署保持 false。
+      ALLOW_PLAINTEXT_CREDENTIALS: ${ALLOW_PLAINTEXT_CREDENTIALS:-false}
       GLAVK_RUNTIME_SECRETS_FILE: ${GLAVK_RUNTIME_SECRETS_FILE:-/app/data/runtime-secrets.env}
     ports:
       - "${BACKEND_BIND_ADDRESS:-127.0.0.1}:${BACKEND_PORT:-6555}:8000"

@@ -1,6 +1,6 @@
 import { clearSession, getAccessToken } from "../auth/session";
 import type { AuthSession, CredentialEnvelope, CredentialPayload, ProjectListResponse, ProjectPayload, WebProject } from "../types";
-import { decryptForClient, encryptForPublicKey, getClientPublicKey } from "../utils/credentialTransport";
+import { decryptForClient, encryptForPublicKey, getClientPublicKey, isTransportCryptoAvailable } from "../utils/credentialTransport";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "";
 
@@ -57,18 +57,20 @@ async function getTransportPublicKey(): Promise<string> {
   return body.public_key;
 }
 
-async function encryptProjectCredentials(
+/** 没有 WebCrypto（HTTP 非安全上下文）时退回明文字段，服务端需开启 ALLOW_PLAINTEXT_CREDENTIALS。 */
+async function credentialFields(
   username: string | undefined,
   password: string | undefined,
   isUpdate: boolean,
-): Promise<CredentialEnvelope | undefined> {
+): Promise<Record<string, unknown>> {
   const normalizedUsername = username?.trim() ?? "";
   const normalizedPassword = password?.trim() ?? "";
-  if (!normalizedUsername && !normalizedPassword) return undefined;
+  if (!normalizedUsername && !normalizedPassword) return {};
   const credentialPayload: CredentialPayload = {};
   if (!isUpdate || normalizedUsername || !normalizedPassword) credentialPayload.username = normalizedUsername;
   if (!isUpdate || normalizedPassword) credentialPayload.password = normalizedPassword || null;
-  return encryptForPublicKey(await getTransportPublicKey(), credentialPayload);
+  if (!isTransportCryptoAvailable()) return { credential_plaintext: credentialPayload };
+  return { credential_envelope: await encryptForPublicKey(await getTransportPublicKey(), credentialPayload) };
 }
 
 async function projectBody(
@@ -76,19 +78,18 @@ async function projectBody(
   isUpdate: boolean,
 ): Promise<Record<string, unknown>> {
   const { username, password, ...rest } = payload;
-  const credentialEnvelope = await encryptProjectCredentials(username, password, isUpdate);
-  return credentialEnvelope ? { ...rest, credential_envelope: credentialEnvelope } : rest;
+  return { ...rest, ...(await credentialFields(username, password, isUpdate)) };
 }
 
 export async function login(username: string, password: string): Promise<AuthSession> {
-  const credential_envelope = await encryptForPublicKey(
-    await getTransportPublicKey(),
-    { username: username.trim(), password },
-  );
+  const credentials: CredentialPayload = { username: username.trim(), password };
+  const loginPayload = isTransportCryptoAvailable()
+    ? { credential_envelope: await encryptForPublicKey(await getTransportPublicKey(), credentials) }
+    : { credential_plaintext: credentials };
   const response = await fetch(`${API_BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ credential_envelope }),
+    body: JSON.stringify(loginPayload),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => null);
@@ -128,6 +129,14 @@ export async function updateProject(id: string, payload: Partial<ProjectPayload>
 }
 
 export async function revealProjectCredential(id: string, accessToken?: string): Promise<CredentialPayload> {
+  if (!isTransportCryptoAvailable()) {
+    const plain = await request<{ project_id: string; credential: CredentialPayload | null }>(
+      `/api/projects/${id}/credential`,
+      undefined,
+      accessToken,
+    );
+    return plain.credential ?? {};
+  }
   const clientPublicKey = await getClientPublicKey();
   const result = await request<{ project_id: string; envelope: CredentialEnvelope }>(
     `/api/projects/${id}/credential`,
